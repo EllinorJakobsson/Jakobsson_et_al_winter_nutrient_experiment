@@ -2,14 +2,14 @@
 
 # DATA AND PACKAGES ####
 #______________________________________________________________________________
-#                  Meta data                                               ====
+#                 Meta data                                               ====
 #______________________________________________________________________________
 # Script by: Ellinor Jakobsson, 2024-2025
 # Script for plotting all figures and doing all analyses in manuscript:
 #"Timing of nutrient input pulses during ice cover regulates lake spring plankton dynamics"
 
 #______________________________________________________________________________
-#                  Load data and packages                                  ====
+#                 Load data and packages                                  ====
 #______________________________________________________________________________
 library(rstudioapi)
 library(tidyr)
@@ -66,7 +66,7 @@ Zooplankton_data <- readxl::read_xlsx(paste0(dir, "Zooplankton_data.xlsx"))
 
 # MODELS ####
 #______________________________________________________________________________
-#                  Bacterial abundance - GAM Mixed effect global model     ==== 
+#                 Bacterial abundance - GAM Mixed effect global model     ==== 
 #______________________________________________________________________________
 #Check for linearity
 # Load necessary libraries
@@ -124,7 +124,7 @@ summary(model_gamm_interaction$gam)
 FCM_data_QC %>% group_by(ID) %>% reframe(mean(Abundance_Bacteria_events_mL_V),
                                          sd(Abundance_Bacteria_events_mL_V))
 #______________________________________________________________________________
-#                   Chl-a - GAM Mixed effect global model                  ==== 
+#                 Chl-a - GAM Mixed effect global model                  ==== 
 #______________________________________________________________________________
 
 #Check for linearity
@@ -192,7 +192,7 @@ Chla_data_QC %>% group_by(ID) %>% reframe(mean(Chla),
                                           sd(Chla))
 
 #______________________________________________________________________________
-#                  P-I curve (K) - NLS and GAM Mixed effect global model   ====
+#                 P-I curve (K) - NLS and GAM Mixed effect global model   ====
 #______________________________________________________________________________
 #Fit Maelchin-Menkins curve using nls
 # 1. Calculate the darkrate and corrections
@@ -302,8 +302,6 @@ plot(lm_model$residuals ~ Big_data_filter$DOY)
 abline(h = 0, col = "red")
 
 # 5. Statistical tests
-# Ramsey's RESET test for non-linearity
-resettest(lm_model)
 Big_data_filter$ID <- as.factor(Big_data_filter$ID)
 Big_data_filter$ID <- relevel(Big_data_filter$ID, ref = "Early")
 
@@ -319,7 +317,7 @@ summary(model_gamm_simple$gam)
 #summary(model_gamm_interaction$gam)
 
 #______________________________________________________________________________
-#                  Trophic modes - NLS and GAM Mixed effect global model   ====
+#                 Trophic modes - GAM Mixed effect global model   ====
 #______________________________________________________________________________
 Trophic_mode_data <- Final_biovolume_data
 Trophic_mode_data$ID <- factor(Trophic_mode_data$ID)
@@ -327,6 +325,41 @@ Trophic_mode_data$ID <- factor(Trophic_mode_data$ID)
 Trophic_mode_data1 <- Trophic_mode_data %>% filter(Trophic_mode == "Mixotroph")
 Trophic_mode_data2 <- Trophic_mode_data %>% filter(Trophic_mode == "Autotroph")
 
+# 1. Plot the data to visually inspect non-linear trends
+ggplot(Trophic_mode_data1, aes(x = DOY, y = Sum_biovolume, color = ID)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE) +
+  theme_minimal()
+
+# 2. Fit linear, polynomial, and non-linear models
+# Linear model
+lm_model <- lm(Sum_biovolume ~ DOY, data = Trophic_mode_data1)
+summary(lm_model)
+
+# Polynomial model
+poly_model <- lm(Sum_biovolume ~ poly(DOY, 2), data = Trophic_mode_data1)
+summary(poly_model)
+
+# Non-linear model using logistic growth
+nls_model <- nls(Sum_biovolume ~ SSlogis(DOY, Asym, xmid, scal), data = Trophic_mode_data1)
+summary(nls_model)
+
+# Compare models using AIC
+AIC(lm_model, poly_model, nls_model)
+
+Trophic_mode_data1 <- Trophic_mode_data1 %>% drop_na(Sum_biovolume)
+# 3. Fit a Generalized Additive Model (GAM)
+gam_model <- gam(Sum_biovolume ~ s(DOY, bs = "cs", k = 4), data = Trophic_mode_data1)
+summary(gam_model)
+
+# Plot the fitted GAM
+plot(gam_model, residuals = TRUE)
+
+# 4. Examine residuals from the linear model
+plot(lm_model$residuals ~ Trophic_mode_data1$DOY)
+abline(h = 0, col = "red")
+
+# 5. Statistical tests
 Trophic_mode_data1$ID <- relevel(Trophic_mode_data1$ID, ref = "Control")
 
 l_gamm_simple <- gamm(Sum_biovolume ~ ID + s(DOY, k = 4),
@@ -338,6 +371,45 @@ model_gamm_interaction <- gamm(Sum_biovolume ~ s(DOY, by = ID, k = 4),
                                data = Trophic_mode_data1)
 summary(l_gamm_simple$gam)
 summary(model_gamm_interaction$gam)
+
+
+
+
+# 1. Plot the data to visually inspect non-linear trends
+ggplot(Trophic_mode_data2, aes(x = DOY, y = Sum_biovolume, color = ID)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE) +
+  theme_minimal()
+
+# 2. Fit linear, polynomial, and non-linear models
+# Linear model
+lm_model <- lm(Sum_biovolume ~ DOY, data = Trophic_mode_data2)
+summary(lm_model)
+
+# Polynomial model
+poly_model <- lm(Sum_biovolume ~ poly(DOY, 2), data = Trophic_mode_data2)
+summary(poly_model)
+
+# Non-linear model using logistic growth
+nls_model <- nls(Sum_biovolume ~ SSlogis(DOY, Asym, xmid, scal), data = Trophic_mode_data2)
+summary(nls_model)
+
+# Compare models using AIC
+AIC(lm_model, poly_model, nls_model)
+
+Trophic_mode_data2 <- Trophic_mode_data2 %>% drop_na(Sum_biovolume)
+# 3. Fit a Generalized Additive Model (GAM)
+gam_model <- gam(Sum_biovolume ~ s(DOY, bs = "cs", k = 4), data = Trophic_mode_data2)
+summary(gam_model)
+
+# Plot the fitted GAM
+plot(gam_model, residuals = TRUE)
+
+# 4. Examine residuals from the linear model
+plot(lm_model$residuals ~ Trophic_mode_data2$DOY)
+abline(h = 0, col = "red")
+
+
 
 # Change the reference level of ID
 Trophic_mode_data2$ID <- relevel(Trophic_mode_data2$ID, ref = "Late")
@@ -356,7 +428,7 @@ model_gamm_interaction$gam
 
 
 #______________________________________________________________________________
-#                 Rotifer abundance - NLS and GAM Mixed effect global model ====
+#                 Rotifer abundance - GAM Mixed effect global model ====
 #______________________________________________________________________________
 
 Zooplankton_data$DOY <- lubridate::yday(Zooplankton_data$Date)
@@ -378,7 +450,7 @@ summary(model_gamm_interaction$gam)
 
 # PLOTTING ####
 #______________________________________________________________________________
-#                  FIGURE 1; SENSOR DATA                                   ====
+#                 FIGURE 1; SENSOR DATA                                   ====
 #______________________________________________________________________________
 Sensor_data <- Sensor_data %>% separate(Date, into = c("Date", "Time"), sep = " ")
 Sensor_data
@@ -468,7 +540,7 @@ Sensor_plot
 dev.off()
 setwd(dir)
 #______________________________________________________________________________
-#                  FIGURE 2; BACTERIAL ABUNDANCE                           ====       
+#                 FIGURE 2; BACTERIAL ABUNDANCE                           ====       
 #______________________________________________________________________________
 
 library(scales)
@@ -501,7 +573,7 @@ dev.off()
 setwd(dir)
 
 #______________________________________________________________________________
-#                  FIGURE 3; CHLA AND K P-I curve                          ====       
+#                 FIGURE 3; CHLA AND K P-I curve                          ====       
 #______________________________________________________________________________
 conflict_prefer(name = "yday", "lubridate")
 
@@ -565,7 +637,7 @@ dev.off()
 setwd(dir)
 
 #______________________________________________________________________________
-#                  FIGURE 4; PHYTOPLANKTON TROPHIC MODE                    ====
+#                 FIGURE 4; PHYTOPLANKTON TROPHIC MODE                    ====
 #______________________________________________________________________________
 # calculate n
 Final_biovolume_data %>% group_by(ID, Trophic_mode) %>% drop_na(Sum_biovolume) %>% count()
@@ -592,7 +664,7 @@ dev.off()
 setwd(dir)
 
 #______________________________________________________________________________
-#                  FIGURE 5; ZOOPLANKTON ABUNDANCE                         ====  
+#                 FIGURE 5; ZOOPLANKTON ABUNDANCE                         ====  
 #______________________________________________________________________________
 Zooplankton_data
 
@@ -644,7 +716,7 @@ setwd(dir)
 
 # SUPPLEMENTS ####
 #______________________________________________________________________________
-#                  SENSOR DATA - TABLE S2 + DESCRIPTIVES      ====
+#                 SENSOR DATA - TABLE S2 + DESCRIPTIVES      ====
 #______________________________________________________________________________
 #CAlculate mean (2 times)
 
@@ -666,6 +738,8 @@ DO_data <- Sensor_data_mean %>%
   mutate(Treatment = case_when(Date >= as.Date("2023-02-28")~"Post", T~"Pre"))
 
 DO_data$Mesocosm <- as.factor(DO_data$Mesocosm)
+DO_data$ID <- factor(DO_data$ID)
+DO_data$ID <- relevel(DO_data$ID, ref = "Control")
 
 #DO_data <- relevel(DO_data$ID)
 library(lmerTest)
@@ -673,6 +747,8 @@ model <- lmerTest::lmer(Mean_measurement ~ ID * Treatment + (1 | Date) + (1|Meso
 summary(model)  #included p-values for fixed effects
 
 
+model_relevel <- lmerTest::lmer(Mean_measurement ~ ID * Treatment + (1 | Date) + (1|Mesocosm), data = DO_data)
+summary(model_relevel)
 
 #PAR DAILY MEAN
 Sensor_data_mean <- Sensor_data %>% filter(Date <= as.Date("2023-03-13") & Date >= as.Date("2023-02-06")) %>%
@@ -780,7 +856,7 @@ sd(Snow_ice_data_QC$Ice_thickness_mesocosms, na.rm = T)
 
 
 #______________________________________________________________________________
-#                  NP uptake rates - FIGURE S4 AND FIGURE S1               ====
+#                 NP uptake rates - FIGURE S4 AND FIGURE S1               ====
 #______________________________________________________________________________
 CNP_data <- CNP_data_QC %>% select(Mesocosm, Date, ID, DOC, TOC, DN, TN, DP, TP) %>% gather(Nutrient, Conc, -Mesocosm, -Date, -ID) %>% filter(ID != "Lake")
 
@@ -933,7 +1009,7 @@ summary(Anova3) #Check results
 TukeyHSD(Anova3) #Run pairwise comparison
 
 #______________________________________________________________________________
-#                  CNP OVER EXPERIMENT - FIGURE S3                        ====
+#                 CNP OVER EXPERIMENT - FIGURE S3                        ====
 #______________________________________________________________________________
 CNP_data <- CNP_data_QC %>%
   gather(Nutrient, Conc, -Date, -ID, -Mesocosm) %>%
@@ -980,7 +1056,7 @@ setwd(dir)
 
 
 #______________________________________________________________________________
-#                  Calculate P assimilation?                        ====
+#                 Calculate P assimilation?                        ====
 #______________________________________________________________________________
 # Load necessary libraries
 library(dplyr)
